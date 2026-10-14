@@ -1,0 +1,24 @@
+name: release
+on:
+  workflow_call:
+    outputs:
+      release_created: { value: '${{ jobs.release-please.outputs.release_created }}' }
+      tag_name: { value: '${{ jobs.release-please.outputs.tag_name }}' }
+permissions:
+  contents: read
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    permissions: { contents: write, pull-requests: write, issues: write, actions: write }
+    outputs:
+      release_created: ${{ steps.rp.outputs.release_created }}
+      tag_name: ${{ steps.rp.outputs.tag_name }}
+    steps:
+      # Lee release-please-config.json y .release-please-manifest.json de la raíz del repo.
+      - uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
+        id: rp
+      # Un tag creado con GITHUB_TOKEN no dispara workflows; workflow_dispatch sí (doc de GitHub). Así prod sale solo de acá.
+      - name: Disparar deploy-prod sobre el tag
+        if: steps.rp.outputs.release_created
+        env: { GH_TOKEN: '${{ github.token }}', TAG: '${{ steps.rp.outputs.tag_name }}' }
+        run: gh workflow run deploy-prod.yml --repo "$GITHUB_REPOSITORY" --ref "$TAG"

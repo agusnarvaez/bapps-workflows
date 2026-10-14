@@ -40,6 +40,12 @@ jobs:
     uses: agusnarvaez/bapps-workflows/.github/workflows/security.yml@v1
 ```
 
+### `release.yml`
+
+release-please: mantiene el release PR y, al mergearse, crea el tag y dispara `deploy-prod.yml` del repo sobre ese tag. Outputs: `release_created`, `tag_name`. El job que lo llama necesita `contents`, `pull-requests`, `issues` y `actions` en `write` (ver `templates/release.yml`).
+
+Las plantillas para los repos están en `templates/`.
+
 ### `selftest.yml`
 
 Prueba los dos de arriba contra los fixtures de `tests/`. No se llama desde afuera.
