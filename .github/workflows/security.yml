@@ -26,4 +26,9 @@ jobs:
           curl -sSfL -o osv-scanner https://github.com/google/osv-scanner/releases/download/v2.6.0/osv-scanner_linux_amd64
           echo "ca69b3d3cd08f889a49dc0a383122f71cc528b83803671df5fd874d97485b108  osv-scanner" | sha256sum -c -
           chmod +x osv-scanner
-      - run: ./osv-scanner scan source -r "${{ inputs.working-directory }}"
+      # ponytail: osv-scanner 2.x sale con 128 si no encuentra paquetes (repo sin dependencias, p. ej. los fixtures):
+      # eso no es un fallo. Las vulnerabilidades siguen saliendo con 1 y rompen el job.
+      - run: |
+          rc=0
+          ./osv-scanner scan source -r "${{ inputs.working-directory }}" || rc=$?
+          if [ "$rc" -ne 0 ] && [ "$rc" -ne 128 ]; then exit "$rc"; fi
