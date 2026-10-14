@@ -14,6 +14,10 @@ jobs:
   guarda-prod:
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: La guarda real sigue en deploy-vps.yml (la copia de abajo no puede divergir)
+        run: |
+          grep -qF "if: inputs.env == 'prod' && !startsWith(github.ref, 'refs/tags/v')" .github/workflows/deploy-vps.yml
       - name: La condición de la guarda rechaza main y acepta v*
         run: |
           check() { case "$1" in refs/tags/v*) echo permitido;; *) echo bloqueado;; esac; }

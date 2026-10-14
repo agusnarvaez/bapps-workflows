@@ -33,6 +33,22 @@ jobs:
         run: |
           echo "FATAL: prod solo se deploya desde un tag v* (ref actual: $GITHUB_REF)" >&2
           exit 1
+      - name: Validar inputs (antes de armar cualquier comando remoto)
+        env:
+          APP: '${{ inputs.app }}'
+          ENVN: '${{ inputs.env }}'
+          KIND: '${{ inputs.kind }}'
+          RDIR: '${{ inputs.remote-dir }}'
+          RSCRIPT: '${{ inputs.remote-script }}'
+        run: |
+          fail() { echo "FATAL: $1" >&2; exit 1; }
+          [[ "$ENVN" == testing || "$ENVN" == prod ]] || fail "env debe ser testing o prod (recibido: $ENVN)"
+          [[ "$KIND" == static || "$KIND" == script ]] || fail "kind debe ser static o script (recibido: $KIND)"
+          [[ "$APP" =~ ^[a-z0-9-]+$ ]] || fail "app inválida: $APP"
+          if [ "$KIND" = script ]; then
+            [[ "$RDIR" =~ ^/srv/[A-Za-z0-9/_-]+$ && "$RDIR" != *..* ]] || fail "remote-dir inválido: $RDIR"
+            [[ "$RSCRIPT" =~ ^[A-Za-z0-9/_.-]+$ && "$RSCRIPT" != *..* ]] || fail "remote-script inválido: $RSCRIPT"
+          fi
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: { fetch-depth: 0 }   # git describe necesita los tags
       - name: Variables de build
@@ -72,17 +88,17 @@ jobs:
         env: { T: 'deploy@${{ inputs.vps-host }}', D: '/srv/apps/${{ inputs.app }}-${{ inputs.env }}', DIR: '${{ inputs.build-dir }}' }
         run: |
           set -euo pipefail
-          ssh "$T" "mkdir -p $D/releases/$GITHUB_SHA"
+          ssh "$T" "mkdir -p '$D/releases/$GITHUB_SHA'"
           rsync -az --delete "$DIR/" "$T:$D/releases/$GITHUB_SHA/"
-          ssh "$T" "ln -sfn $D/releases/$GITHUB_SHA $D/current.tmp && mv -Tf $D/current.tmp $D/current && ls -1dt $D/releases/* | tail -n +6 | xargs -r rm -rf"
+          ssh "$T" "ln -sfn '$D/releases/$GITHUB_SHA' '$D/current.tmp' && mv -Tf '$D/current.tmp' '$D/current' && ls -1dt '$D'/releases/* | tail -n +6 | xargs -r rm -rf"
       - name: Publicar (script, patrón canastita)
         if: inputs.kind == 'script'
         env: { T: 'deploy@${{ inputs.vps-host }}', D: '${{ inputs.remote-dir }}', S: '${{ inputs.remote-script }}', E: '${{ inputs.env }}' }
         run: |
           set -euo pipefail
-          ssh "$T" "rm -rf $D && mkdir -p $D"
-          git archive --format=tar HEAD | ssh "$T" "tar -x -C $D"
-          ssh "$T" "APP_ENV=$E GIT_SHA=$GITHUB_SHA bash $D/$S"
+          ssh "$T" "rm -rf '$D' && mkdir -p '$D'"
+          git archive --format=tar HEAD | ssh "$T" "tar -x -C '$D'"
+          ssh "$T" "APP_ENV=$E GIT_SHA=$GITHUB_SHA bash '$D/$S'"
       - name: Smoke contra health (por la IP pública, valida TLS)
         env: { URL: '${{ inputs.health-url }}', IP: '${{ inputs.vps-public-ip }}' }
         run: |
