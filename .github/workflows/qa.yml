@@ -1,0 +1,64 @@
+name: qa
+on:
+  workflow_call:
+    inputs:
+      working-directory: { type: string, default: '.' }
+      node-version: { type: string, default: '24' }
+      python-version: { type: string, default: '3.12' }
+      test-command: { type: string, default: '' }   # vacío = detectar (test:ci, test, manage.py test, pytest)
+      manifest-path: { type: string, default: 'bapps.yml' }
+permissions:
+  contents: read
+jobs:
+  manifest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Validar bapps.yml contra bapps.schema.json
+        run: pipx run check-jsonschema==0.38.2 --schemafile https://raw.githubusercontent.com/agusnarvaez/bapps-workflows/v1/bapps.schema.json "${{ inputs.manifest-path }}"
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: ${{ inputs.working-directory }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Detectar stack
+        id: stack
+        run: |
+          if [ -f package.json ]; then echo node=true >> "$GITHUB_OUTPUT"; fi
+          if [ -f pnpm-lock.yaml ]; then echo pm=pnpm >> "$GITHUB_OUTPUT"; else echo pm=npm >> "$GITHUB_OUTPUT"; fi
+          if [ -f requirements.txt ] || [ -f pyproject.toml ]; then echo python=true >> "$GITHUB_OUTPUT"; fi
+      - if: steps.stack.outputs.node && steps.stack.outputs.pm == 'pnpm'
+        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        with:
+          package_json_file: ${{ inputs.working-directory }}/package.json  # ponytail: un uses no hereda working-directory
+      - if: steps.stack.outputs.node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ inputs.node-version }}
+          cache: ${{ steps.stack.outputs.pm }}
+          cache-dependency-path: ${{ inputs.working-directory }}/${{ steps.stack.outputs.pm == 'pnpm' && 'pnpm-lock.yaml' || 'package-lock.json' }}
+      - if: steps.stack.outputs.node
+        name: Node — install, lint, test, build
+        env: { PM: '${{ steps.stack.outputs.pm }}', CMD: '${{ inputs.test-command }}' }
+        run: |
+          if [ "$PM" = pnpm ]; then pnpm install --frozen-lockfile; else npm ci; fi
+          $PM run --if-present lint
+          if [ -n "$CMD" ]; then bash -c "$CMD"; else
+            s=$(node -p "const s=require('./package.json').scripts||{}; s['test:ci']?'test:ci':(s.test?'test':'')")
+            if [ -n "$s" ]; then $PM run "$s"; fi
+          fi
+          $PM run --if-present build
+      - if: steps.stack.outputs.python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with: { python-version: '${{ inputs.python-version }}', cache: pip }
+      - if: steps.stack.outputs.python
+        name: Python — install y test
+        env: { CMD: '${{ inputs.test-command }}' }
+        run: |
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; else pip install -e .; fi
+          if [ -n "$CMD" ]; then bash -c "$CMD"
+          elif [ -f manage.py ]; then python manage.py test
+          else pip install pytest && pytest; fi

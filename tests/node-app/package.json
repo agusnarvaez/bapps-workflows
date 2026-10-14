@@ -1,0 +1,1 @@
+{"name":"node-app","private":true,"packageManager":"pnpm@10.18.0","scripts":{"test":"node --test"}}

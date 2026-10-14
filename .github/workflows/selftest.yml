@@ -1,0 +1,13 @@
+name: selftest
+on: { push: { branches: [main] }, pull_request: {} }
+permissions:
+  contents: read
+jobs:
+  node:
+    uses: ./.github/workflows/qa.yml
+    with: { working-directory: tests/node-app, manifest-path: tests/node-app/bapps.yml }
+  python:
+    uses: ./.github/workflows/qa.yml
+    with: { working-directory: tests/python-app, manifest-path: tests/python-app/bapps.yml }
+  security:
+    uses: ./.github/workflows/security.yml

@@ -1,0 +1,203 @@
+{
+  "$id": "https://raw.githubusercontent.com/agusnarvaez/bapps-workflows/v1/bapps.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "version": {
+      "type": "number",
+      "const": 1
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]{1,62}$"
+    },
+    "client": {
+      "type": "string"
+    },
+    "kind": {
+      "type": "string",
+      "enum": [
+        "app",
+        "site",
+        "api",
+        "tool",
+        "wp_external",
+        "ai_builder"
+      ]
+    },
+    "stack": {
+      "default": [],
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "owner": {
+      "type": "string"
+    },
+    "environments": {
+      "type": "object",
+      "properties": {
+        "dev": {
+          "type": "object",
+          "properties": {
+            "url": {
+              "type": "string",
+              "format": "uri"
+            },
+            "host": {
+              "type": "string",
+              "enum": [
+                "vps",
+                "hostinger_shared",
+                "firebase",
+                "fly",
+                "sanity",
+                "wp_external",
+                "ai_builder",
+                "other"
+              ]
+            },
+            "health": {
+              "type": "string",
+              "format": "starts_with",
+              "pattern": "^\\/.*"
+            },
+            "workflow": {
+              "type": "string",
+              "pattern": "\\.ya?ml$"
+            }
+          },
+          "required": [
+            "url",
+            "host"
+          ]
+        },
+        "testing": {
+          "type": "object",
+          "properties": {
+            "url": {
+              "type": "string",
+              "format": "uri"
+            },
+            "host": {
+              "type": "string",
+              "enum": [
+                "vps",
+                "hostinger_shared",
+                "firebase",
+                "fly",
+                "sanity",
+                "wp_external",
+                "ai_builder",
+                "other"
+              ]
+            },
+            "health": {
+              "type": "string",
+              "format": "starts_with",
+              "pattern": "^\\/.*"
+            },
+            "workflow": {
+              "type": "string",
+              "pattern": "\\.ya?ml$"
+            }
+          },
+          "required": [
+            "url",
+            "host"
+          ]
+        },
+        "prod": {
+          "type": "object",
+          "properties": {
+            "url": {
+              "type": "string",
+              "format": "uri"
+            },
+            "host": {
+              "type": "string",
+              "enum": [
+                "vps",
+                "hostinger_shared",
+                "firebase",
+                "fly",
+                "sanity",
+                "wp_external",
+                "ai_builder",
+                "other"
+              ]
+            },
+            "health": {
+              "type": "string",
+              "format": "starts_with",
+              "pattern": "^\\/.*"
+            },
+            "workflow": {
+              "type": "string",
+              "pattern": "\\.ya?ml$"
+            }
+          },
+          "required": [
+            "url",
+            "host"
+          ]
+        }
+      }
+    },
+    "domains": {
+      "default": [],
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "services": {
+      "default": [],
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "checks": {
+      "default": {},
+      "type": "object",
+      "propertyNames": {
+        "type": "string"
+      },
+      "additionalProperties": {
+        "type": "string",
+        "enum": [
+          "daily",
+          "weekly",
+          "monthly",
+          "off"
+        ]
+      }
+    },
+    "critical_flows": {
+      "default": [],
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "maintenance": {
+      "type": "object",
+      "properties": {
+        "plan": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "plan"
+      ]
+    }
+  },
+  "required": [
+    "version",
+    "id",
+    "kind",
+    "environments"
+  ]
+}

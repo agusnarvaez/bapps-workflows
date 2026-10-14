@@ -1,0 +1,4 @@
+version: 1
+id: selftest-python
+kind: tool
+environments: {}

@@ -1,0 +1,29 @@
+name: security
+on:
+  workflow_call:
+    inputs:
+      working-directory: { type: string, default: '.' }
+permissions:
+  contents: read
+jobs:
+  gitleaks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { fetch-depth: 0 }   # todo el historial: un secreto viejo sigue siendo un secreto
+      - name: Instalar gitleaks 8.30.1 (checksum verificado)
+        run: |
+          curl -sSfL -o g.tgz https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz
+          echo "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb  g.tgz" | sha256sum -c -
+          tar -xzf g.tgz gitleaks && rm g.tgz
+      - run: ./gitleaks git --redact --no-banner --exit-code 1 .
+  osv:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Instalar osv-scanner 2.6.0 (checksum verificado)
+        run: |
+          curl -sSfL -o osv-scanner https://github.com/google/osv-scanner/releases/download/v2.6.0/osv-scanner_linux_amd64
+          echo "ca69b3d3cd08f889a49dc0a383122f71cc528b83803671df5fd874d97485b108  osv-scanner" | sha256sum -c -
+          chmod +x osv-scanner
+      - run: ./osv-scanner scan source -r "${{ inputs.working-directory }}"
