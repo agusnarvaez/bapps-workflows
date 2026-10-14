@@ -11,3 +11,10 @@ jobs:
     with: { working-directory: tests/python-app, manifest-path: tests/python-app/bapps.yml }
   security:
     uses: ./.github/workflows/security.yml
+  guarda-prod:
+    runs-on: ubuntu-latest
+    steps:
+      - name: La condición de la guarda rechaza main y acepta v*
+        run: |
+          check() { case "$1" in refs/tags/v*) echo permitido;; *) echo bloqueado;; esac; }
+          [ "$(check refs/heads/main)" = bloqueado ] && [ "$(check refs/tags/v1.2.0)" = permitido ]

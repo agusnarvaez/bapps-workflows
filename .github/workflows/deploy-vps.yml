@@ -1,0 +1,94 @@
+name: deploy-vps
+on:
+  workflow_call:
+    inputs:
+      app: { type: string, required: true }
+      env: { type: string, required: true }            # testing | prod
+      kind: { type: string, default: static }           # static | script
+      health-url: { type: string, required: true }      # tiene que devolver el sha deployado
+      build-command: { type: string, default: '' }
+      build-dir: { type: string, default: dist }
+      remote-dir: { type: string, default: '' }         # kind=script: dónde se descomprime el git archive
+      remote-script: { type: string, default: deploy/instalar_ci.sh }
+      node-version: { type: string, default: '24' }
+      vps-host: { type: string, default: 100.94.157.60 }   # IP de Tailscale (docs/setup/vps.md)
+      vps-public-ip: { type: string, default: 72.60.142.71 }
+    secrets:
+      TS_OAUTH_CLIENT_ID: { required: true }
+      TS_OAUTH_SECRET: { required: true }
+      SSH_KEY: { required: true }
+      BUILD_ENV: { required: false }
+permissions:
+  contents: read
+concurrency:
+  group: deploy-${{ inputs.app }}-${{ inputs.env }}
+  cancel-in-progress: false
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Prod solo desde un tag v* (lo crea release-please al mergear el release PR)
+        if: inputs.env == 'prod' && !startsWith(github.ref, 'refs/tags/v')
+        run: |
+          echo "FATAL: prod solo se deploya desde un tag v* (ref actual: $GITHUB_REF)" >&2
+          exit 1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { fetch-depth: 0 }   # git describe necesita los tags
+      - name: Variables de build
+        if: inputs.kind == 'static'
+        env: { BUILD_ENV: '${{ secrets.BUILD_ENV }}' }
+        run: printf '%s\n' "$BUILD_ENV" | grep -E '^[A-Z_][A-Z0-9_]*=' >> "$GITHUB_ENV" || true
+      - if: inputs.kind == 'static' && hashFiles('pnpm-lock.yaml') != ''
+        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - if: inputs.kind == 'static' && hashFiles('package.json') != ''
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with: { node-version: '${{ inputs.node-version }}' }
+      - name: Build
+        if: inputs.kind == 'static' && hashFiles('package.json') != ''
+        env: { CMD: '${{ inputs.build-command }}' }
+        run: |
+          if [ -f pnpm-lock.yaml ]; then pnpm install --frozen-lockfile; PM=pnpm; else npm ci; PM=npm; fi
+          if [ -n "$CMD" ]; then bash -c "$CMD"; else $PM run build; fi
+      - name: version.json y sin source maps
+        if: inputs.kind == 'static'
+        env: { DIR: '${{ inputs.build-dir }}' }
+        run: |
+          printf '{"version":"%s","commit":"%s"}\n' "$(git describe --tags --always)" "$GITHUB_SHA" > "$DIR/version.json"
+          find "$DIR" -name '*.map' -delete
+      - uses: tailscale/github-action@d1b6cd204f8dceda5b3eaad7f1f767be390056cd # v4.2.0
+        with:
+          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+          tags: tag:ci
+      - name: Preparar SSH
+        env: { KEY: '${{ secrets.SSH_KEY }}', HOST: '${{ inputs.vps-host }}' }
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$KEY" > ~/.ssh/id_ed25519 && chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H "$HOST" >> ~/.ssh/known_hosts
+      - name: Publicar (static, release atómico con symlink)
+        if: inputs.kind == 'static'
+        env: { T: 'deploy@${{ inputs.vps-host }}', D: '/srv/apps/${{ inputs.app }}-${{ inputs.env }}', DIR: '${{ inputs.build-dir }}' }
+        run: |
+          set -euo pipefail
+          ssh "$T" "mkdir -p $D/releases/$GITHUB_SHA"
+          rsync -az --delete "$DIR/" "$T:$D/releases/$GITHUB_SHA/"
+          ssh "$T" "ln -sfn $D/releases/$GITHUB_SHA $D/current.tmp && mv -Tf $D/current.tmp $D/current && ls -1dt $D/releases/* | tail -n +6 | xargs -r rm -rf"
+      - name: Publicar (script, patrón canastita)
+        if: inputs.kind == 'script'
+        env: { T: 'deploy@${{ inputs.vps-host }}', D: '${{ inputs.remote-dir }}', S: '${{ inputs.remote-script }}', E: '${{ inputs.env }}' }
+        run: |
+          set -euo pipefail
+          ssh "$T" "rm -rf $D && mkdir -p $D"
+          git archive --format=tar HEAD | ssh "$T" "tar -x -C $D"
+          ssh "$T" "APP_ENV=$E GIT_SHA=$GITHUB_SHA bash $D/$S"
+      - name: Smoke contra health (por la IP pública, valida TLS)
+        env: { URL: '${{ inputs.health-url }}', IP: '${{ inputs.vps-public-ip }}' }
+        run: |
+          H=$(echo "$URL" | sed -E 's#https?://([^/:]+).*#\1#')
+          for i in 1 2 3 4 5; do
+            curl -fsS --max-time 15 --resolve "$H:443:$IP" "$URL" | grep -q "$GITHUB_SHA" && exit 0
+            sleep 5
+          done
+          echo "FATAL: $URL no reporta $GITHUB_SHA" >&2; exit 1
