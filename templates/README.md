@@ -15,3 +15,4 @@ Cada repo las copia y reemplaza los placeholders. Guía completa: `docs/estandar
 | `dependabot.yml` | `.github/dependabot.yml` | `pip` en vez de `npm` en repos Python |
 | `release-please-config.json` | raíz | `release-type`: `node`, `python`, o `simple` sin `pyproject.toml` |
 | `.release-please-manifest.json` | raíz | versión actual del proyecto |
+| `CLAUDE.md` | raíz | sección dotclaude (harness). Si el repo ya tiene `CLAUDE.md` o `AGENTS.md`, pegar sólo la sección |
