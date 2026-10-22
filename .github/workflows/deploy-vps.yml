@@ -25,7 +25,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   deploy:
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.BAPPS_RUNNER || 'ubuntu-latest' }}   # runner propio si el repo tiene BAPPS_RUNNER (bapps-console docs/setup/runner.md)
     timeout-minutes: 20
     steps:
       - name: Prod solo desde un tag v* (lo crea release-please al mergear el release PR)
@@ -72,7 +72,9 @@ jobs:
         run: |
           printf '{"version":"%s","commit":"%s"}\n' "$(git describe --tags --always)" "$GITHUB_SHA" > "$DIR/version.json"
           find "$DIR" -name '*.map' -delete
-      - uses: tailscale/github-action@d1b6cd204f8dceda5b3eaad7f1f767be390056cd # v4.2.0
+      # El runner propio ya está en la tailnet (la del host); Tailscale solo hace falta en los de GitHub.
+      - if: vars.BAPPS_RUNNER == ''
+        uses: tailscale/github-action@d1b6cd204f8dceda5b3eaad7f1f767be390056cd # v4.2.0
         with:
           oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
           oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
@@ -108,3 +110,6 @@ jobs:
             sleep 5
           done
           echo "FATAL: $URL no reporta $GITHUB_SHA" >&2; exit 1
+      - name: Borrar la key SSH (en un runner propio el home sobrevive al job)
+        if: always()
+        run: rm -f ~/.ssh/id_ed25519

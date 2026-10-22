@@ -8,7 +8,7 @@ permissions:
   contents: read
 jobs:
   release-please:
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.BAPPS_RUNNER || 'ubuntu-latest' }}   # runner propio si el repo tiene BAPPS_RUNNER (bapps-console docs/setup/runner.md)
     permissions: { contents: write, pull-requests: write, issues: write, actions: write }
     outputs:
       release_created: ${{ steps.rp.outputs.release_created }}

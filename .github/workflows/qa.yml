@@ -11,13 +11,13 @@ permissions:
   contents: read
 jobs:
   manifest:
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.BAPPS_RUNNER || 'ubuntu-latest' }}   # runner propio si el repo tiene BAPPS_RUNNER (bapps-console docs/setup/runner.md)
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Validar bapps.yml contra bapps.schema.json
         run: pipx run check-jsonschema==0.38.2 --schemafile https://raw.githubusercontent.com/agusnarvaez/bapps-workflows/v1/bapps.schema.json "${{ inputs.manifest-path }}"
   test:
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.BAPPS_RUNNER || 'ubuntu-latest' }}   # runner propio si el repo tiene BAPPS_RUNNER (bapps-console docs/setup/runner.md)
     timeout-minutes: 20
     defaults:
       run:

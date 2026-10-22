@@ -7,7 +7,7 @@ permissions:
   contents: read
 jobs:
   gitleaks:
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.BAPPS_RUNNER || 'ubuntu-latest' }}   # runner propio si el repo tiene BAPPS_RUNNER (bapps-console docs/setup/runner.md)
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: { fetch-depth: 0 }   # todo el historial: un secreto viejo sigue siendo un secreto
@@ -18,7 +18,7 @@ jobs:
           tar -xzf g.tgz gitleaks && rm g.tgz
       - run: ./gitleaks git --redact --no-banner --exit-code 1 .
   osv:
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.BAPPS_RUNNER || 'ubuntu-latest' }}   # runner propio si el repo tiene BAPPS_RUNNER (bapps-console docs/setup/runner.md)
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Instalar osv-scanner 2.6.0 (checksum verificado)
