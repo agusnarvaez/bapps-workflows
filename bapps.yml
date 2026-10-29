@@ -1,0 +1,7 @@
+version: 1
+id: bapps-workflows
+kind: tool
+stack: [github-actions]
+environments: {}
+# Revisión mensual con IA del panel (bapps-console). Sin hosting: sus mejoras llegan a todos los repos por @v1.
+review: { enabled: true, topics: [GitHub Actions, seguridad de la cadena de suministro] }
