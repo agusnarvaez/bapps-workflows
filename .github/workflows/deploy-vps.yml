@@ -12,6 +12,9 @@ on:
       remote-script: { type: string, default: deploy/instalar_ci.sh }
       node-version: { type: string, default: '24' }
       vps-host: { type: string, default: 100.94.157.60 }   # IP de Tailscale (docs/setup/vps.md)
+      # Clave pública SSH del VPS, fija: no se pide en cada deploy (ssh-keyscan fallaba cuando la tailnet tardaba y además
+      # aceptaba cualquier clave). Verificada el 2026-10-30 contra /etc/ssh/ssh_host_ed25519_key.pub del VPS.
+      vps-host-key: { type: string, default: 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEREoE5fXBBLrGwMraC+Pv78cRO3QBZesbt89aKZLoMT' }
       vps-public-ip: { type: string, default: 72.60.142.71 }
     secrets:
       TS_OAUTH_CLIENT_ID: { required: true }
@@ -80,11 +83,11 @@ jobs:
           oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
           tags: tag:ci
       - name: Preparar SSH
-        env: { KEY: '${{ secrets.SSH_KEY }}', HOST: '${{ inputs.vps-host }}' }
+        env: { KEY: '${{ secrets.SSH_KEY }}', HOST: '${{ inputs.vps-host }}', HOST_KEY: '${{ inputs.vps-host-key }}' }
         run: |
           install -m 700 -d ~/.ssh
           printf '%s\n' "$KEY" > ~/.ssh/id_ed25519 && chmod 600 ~/.ssh/id_ed25519
-          ssh-keyscan -H "$HOST" >> ~/.ssh/known_hosts
+          printf '%s %s\n' "$HOST" "$HOST_KEY" >> ~/.ssh/known_hosts
       - name: Publicar (static, release atómico con symlink)
         if: inputs.kind == 'static'
         env: { T: 'deploy@${{ inputs.vps-host }}', D: '/srv/apps/${{ inputs.app }}-${{ inputs.env }}', DIR: '${{ inputs.build-dir }}' }
