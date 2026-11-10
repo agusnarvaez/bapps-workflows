@@ -30,16 +30,21 @@ jobs:
           if [ -f package.json ]; then echo node=true >> "$GITHUB_OUTPUT"; fi
           if [ -f pnpm-lock.yaml ]; then echo pm=pnpm >> "$GITHUB_OUTPUT"; else echo pm=npm >> "$GITHUB_OUTPUT"; fi
           if [ -f requirements.txt ] || [ -f pyproject.toml ]; then echo python=true >> "$GITHUB_OUTPUT"; fi
-      - if: steps.stack.outputs.node && steps.stack.outputs.pm == 'pnpm'
-        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
-        with:
-          package_json_file: ${{ inputs.working-directory }}/package.json  # ponytail: un uses no hereda working-directory
+      # Node antes que pnpm: en el runner propio el self-installer de pnpm/action-setup usa el npm del Node del runner,
+      # que viene sin lib/ ("Cannot find module '../lib/cli.js'", pnpm/action-setup#251). La cache de pnpm la hace
+      # pnpm/action-setup (setup-node no puede: pnpm todavía no existe cuando corre).
       - if: steps.stack.outputs.node
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: ${{ inputs.node-version }}
-          cache: ${{ steps.stack.outputs.pm }}
-          cache-dependency-path: ${{ inputs.working-directory }}/${{ steps.stack.outputs.pm == 'pnpm' && 'pnpm-lock.yaml' || 'package-lock.json' }}
+          cache: ${{ steps.stack.outputs.pm == 'npm' && 'npm' || '' }}
+          cache-dependency-path: ${{ inputs.working-directory }}/package-lock.json
+      - if: steps.stack.outputs.node && steps.stack.outputs.pm == 'pnpm'
+        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        with:
+          package_json_file: ${{ inputs.working-directory }}/package.json  # ponytail: un uses no hereda working-directory
+          cache: true
+          cache_dependency_path: ${{ inputs.working-directory }}/pnpm-lock.yaml
       - if: steps.stack.outputs.node
         name: Node — install, lint, test, build
         env: { PM: '${{ steps.stack.outputs.pm }}', CMD: '${{ inputs.test-command }}' }

@@ -58,11 +58,12 @@ jobs:
         if: inputs.kind == 'static'
         env: { BUILD_ENV: '${{ secrets.BUILD_ENV }}' }
         run: printf '%s\n' "$BUILD_ENV" | grep -E '^[A-Z_][A-Z0-9_]*=' >> "$GITHUB_ENV" || true
-      - if: inputs.kind == 'static' && hashFiles('pnpm-lock.yaml') != ''
-        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      # Node antes que pnpm: ver el comentario en qa.yml (pnpm/action-setup#251, runner propio).
       - if: inputs.kind == 'static' && hashFiles('package.json') != ''
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with: { node-version: '${{ inputs.node-version }}' }
+      - if: inputs.kind == 'static' && hashFiles('pnpm-lock.yaml') != ''
+        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
       - name: Build
         if: inputs.kind == 'static' && hashFiles('package.json') != ''
         env: { CMD: '${{ inputs.build-command }}' }
