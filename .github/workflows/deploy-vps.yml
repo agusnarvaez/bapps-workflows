@@ -96,7 +96,9 @@ jobs:
           set -euo pipefail
           ssh "$T" "mkdir -p '$D/releases/$GITHUB_SHA'"
           rsync -az --delete "$DIR/" "$T:$D/releases/$GITHUB_SHA/"
-          ssh "$T" "ln -sfn '$D/releases/$GITHUB_SHA' '$D/current.tmp' && mv -Tf '$D/current.tmp' '$D/current' && ls -1dt '$D'/releases/* | tail -n +6 | xargs -r rm -rf"
+          # Manifiesto sha256 del release (fuera de current: no se sirve). Lo usa el chequeo "publicado vs repo" de bapps-console.
+          ssh "$T" "mkdir -p '$D/manifests' && cd '$D/releases/$GITHUB_SHA' && find . -type f -print0 | sort -z | xargs -0 -r sha256sum > '$D/manifests/$GITHUB_SHA.sha256'"
+          ssh "$T" "ln -sfn '$D/releases/$GITHUB_SHA' '$D/current.tmp' && mv -Tf '$D/current.tmp' '$D/current' && ls -1dt '$D'/releases/* | tail -n +6 | xargs -r rm -rf && ls -1dt '$D'/manifests/* | tail -n +6 | xargs -r rm -f"
       - name: Publicar (script, patrón canastita)
         if: inputs.kind == 'script'
         env: { T: 'deploy@${{ inputs.vps-host }}', D: '${{ inputs.remote-dir }}', S: '${{ inputs.remote-script }}', E: '${{ inputs.env }}' }
