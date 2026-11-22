@@ -4,6 +4,8 @@ on:
     inputs:
       base-url: { type: string, required: true }
       working-directory: { type: string, default: '.' }
+      # Comando antes de Playwright (ej. bapps-console crea su usuario de prueba en testing). Tiene SSH_KEY en el env.
+      setup-script: { type: string, default: '' }
 permissions:
   contents: read
 jobs:
@@ -24,5 +26,17 @@ jobs:
       - run: |
           if [ -f pnpm-lock.yaml ]; then pnpm install --frozen-lockfile; else npm ci; fi
           npx playwright install --with-deps chromium
-          npx playwright test --project=chromium
+      - if: inputs.setup-script != ''
+        run: ${{ inputs.setup-script }}
+        env: { SSH_KEY: '${{ secrets.SSH_KEY }}' }
+      - run: npx playwright test --project=chromium
         env: { BASE_URL: '${{ inputs.base-url }}' }
+      # Capturas y errores de consola para la verificación con IA del panel (bapps-console, Fase 4): el worker baja este
+      # artifact por el run. 7 días alcanzan: el runner lo baja en la noche siguiente.
+      - if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: e2e-${{ github.sha }}
+          path: ${{ inputs.working-directory }}/test-results/
+          retention-days: 7
+          if-no-files-found: ignore
