@@ -29,14 +29,20 @@ jobs:
       - if: inputs.setup-script != ''
         run: ${{ inputs.setup-script }}
         env: { SSH_KEY: '${{ secrets.SSH_KEY }}' }
-      - run: npx playwright test --project=chromium
+      - id: pw
+        run: npx playwright test --project=chromium
         env: { BASE_URL: '${{ inputs.base-url }}' }
-      # Capturas y errores de consola para la verificación con IA del panel (bapps-console, Fase 4): el worker baja este
-      # artifact por el run. 7 días alcanzan: el runner lo baja en la noche siguiente.
-      - if: always()
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: e2e-${{ github.sha }}
-          path: ${{ inputs.working-directory }}/test-results/
-          retention-days: 7
-          if-no-files-found: ignore
+      # Capturas y errores de consola para la verificación con IA del panel (bapps-console, Fase 4). En el runner propio
+      # de un piloto, /e2e-out es una carpeta de la zenbook (una por repo, bapps-console infra/runner/runners.sh) que lee
+      # el runner de IA de la misma máquina. Sin carpeta (ubuntu-latest u otro repo) no se guarda nada: los artifacts de
+      # GitHub no se usan porque la cuota de almacenamiento se llenó (2026-11-22).
+      - if: always() && hashFiles(format('{0}/test-results/**', inputs.working-directory)) != ''
+        env: { RESULTADO: '${{ steps.pw.outcome }}', RUN: '${{ github.run_id }}', SHA: '${{ github.sha }}' }
+        run: |
+          [ -d /e2e-out ] && [ -w /e2e-out ] || { echo "sin /e2e-out: no se guardan capturas"; exit 0; }
+          dest="/e2e-out/$RUN"
+          rm -rf "$dest.tmp" && cp -r test-results "$dest.tmp"
+          printf '{"runId":%s,"sha":"%s","resultado":"%s","at":"%s"}\n' "$RUN" "$SHA" "$RESULTADO" "$(date -u +%FT%TZ)" > "$dest.tmp/meta.json"
+          rm -rf "$dest" && mv "$dest.tmp" "$dest"
+          # ponytail: retención por antigüedad; el runner de IA borra lo que ya juzgó.
+          find /e2e-out -mindepth 1 -maxdepth 1 -type d -mtime +14 -exec rm -rf {} +
