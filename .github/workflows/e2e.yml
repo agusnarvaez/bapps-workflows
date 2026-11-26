@@ -26,6 +26,15 @@ jobs:
       - run: |
           if [ -f pnpm-lock.yaml ]; then pnpm install --frozen-lockfile; else npm ci; fi
           npx playwright install --with-deps chromium
+      # Testing en la tailnet (bapps-console: URL *.ts.net y SSH al VPS por su IP de Tailscale). El runner propio ya está
+      # en la tailnet; en GitHub (zenbook apagada, bapps-console docs/setup/runner.md) entra como en deploy-vps.yml.
+      # Los secretos llegan con `secrets: inherit`. Un sitio público no entra a la tailnet ni necesita los secretos.
+      - if: vars.BAPPS_RUNNER == '' && contains(inputs.base-url, '.ts.net')
+        uses: tailscale/github-action@d1b6cd204f8dceda5b3eaad7f1f767be390056cd # v4.2.0
+        with:
+          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+          tags: tag:ci
       - if: inputs.setup-script != ''
         run: ${{ inputs.setup-script }}
         env: { SSH_KEY: '${{ secrets.SSH_KEY }}' }
